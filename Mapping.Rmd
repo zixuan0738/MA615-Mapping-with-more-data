@@ -1,0 +1,135 @@
+---
+title: "FEMA_Data_Mapping"
+author: "Zijie Huang"
+date: "2020/11/8"
+output: 
+  pdf_document: 
+    latex_engine: xelatex
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+pacman::p_load("tidyverse","knitr","maps","tmap","sp","rgeos","sf")
+```
+
+```{r}
+#Load data
+disaster <- read.csv("DisasterSummariesCleaned.csv",header = TRUE)
+detail <- read.csv("hurricaneClean.csv",header = TRUE)
+#View data
+#head(disaster)
+#disaster$year %>% unique
+#2009 2010 2011 2012 2016 2017 2018 2013
+```
+
+```{r}
+#Get name by county.fips
+county_fips <- county.fips
+
+#Get state name + county name
+disaster <- disaster %>%
+              mutate(fips = fipsStateCode * 1000 + fipsCountyCode)
+disaster <- left_join(disaster,county_fips, by = "fips")
+disaster <- disaster %>% 
+              select(c(26,24,2,4,5,11)) %>%
+              mutate(ID = polyname) %>%
+              separate(polyname,c("state","county"),sep = ",")
+county_fips[nrow(county_fips),]
+
+
+
+#Get subdata by condition
+disaster_sub <- disaster %>% 
+                  filter(year==2010,
+                        state=="texas",
+                        disasterNumber==1931,
+                        paProgramDeclared==1)
+
+
+detail_sub <- detail %>%
+              filter(disasterNumber==1931) %>%
+              mutate(ID = str_c(state,county,sep = ","))
+
+ detail_sub2 <- detail_sub %>%
+                  group_by(ID) %>%
+                  summarise(total = sum(totalObligated))
+
+detail_sub <- left_join(detail_sub,count(detail_sub,ID),by = "ID")
+detail_sub <- left_join(detail_sub,detail_sub2,by = "ID")
+              
+detail_sub <- detail_sub %>% 
+                  select(c(13,14,15)) %>%
+                  rename("Project Number" = "n","Federal Share Obligated" = "total") %>%
+                  mutate(ID = str_to_lower(ID,locale="en"))
+
+head(detail_sub)
+#select states 
+StatesInt <- state.name
+StatesInt <- str_to_lower(StatesInt,locale = "en")
+
+#Combine county map with our subdata
+county <- st_as_sf(map("county",StatesInt,plot=F,fill=T))
+
+
+##Choose by condition
+county_sub <- subset(county,grepl("texas",county$ID))
+
+
+##Combine
+county_sub <- left_join(county_sub,disaster_sub,by = "ID")
+
+head(county_sub)
+
+county_sub <- left_join(county_sub,detail_sub,by = "ID")
+
+head(county_sub)
+
+##Deal with PA
+county_sub[is.na(county_sub)] <- 0
+
+county_sub$`Designated Counties` <- ifelse(county_sub$paProgramDeclared==1,"Public Assistance","No Designation")
+
+head(county_sub)
+
+#Get x,y coordinates
+county_sub <- cbind(county_sub, st_coordinates(st_centroid(county_sub)))
+
+#Get county name
+county_sub <- county_sub %>%
+                separate(ID,c("state","county"),sep = ",")
+county_sub
+
+```
+
+```{r,fig.width = 20,fig.height = 20}
+#Plot
+      col <- c("white","lightgoldenrod1")
+    list <- unique(county_sub$paProgramDeclared)
+    if(length(list)==1 & list[1]==1){col <- c("lightgoldenrod1","white")}
+  
+  head(county_sub)
+  b <- county_sub$disasterNumber[1]
+  c <- county_sub$declarationType[1]
+  d <- str_sub(county_sub$declarationDate[1],1,10)
+  e <- county_sub$state[1]
+  title <- str_c("FEMA-",b,"-",c,", ",str_to_title(e)," Disaster Declaration as of ",d,sep = "")
+  
+  ggplot() +
+  geom_sf(data = county_sub,aes(fill = Designated.Counties)) +
+  scale_fill_manual(values=c("white","lightgoldenrod1")) +
+  ggtitle(title) +
+  geom_text(data = county_sub, aes(X, Y, label = county), size = 5, fontface = "bold") +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        axis.text.x=element_blank(),
+        axis.text.y=element_blank(),
+        legend.title = element_text(size = 30),
+        legend.text = element_text(size = 30),
+        plot.title = element_text(hjust = 0.5, size = 30)
+        )
+```
+
+```{r}
+  ggplot() +
+  geom_sf(data = county)
+```

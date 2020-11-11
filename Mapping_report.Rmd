@@ -1,0 +1,236 @@
+---
+title: "Mapping With More Data"
+author: "Zixuan Liu, Zijie Huang"
+date: "11/11/2020"
+output:
+  pdf_document: 
+    latex_engine: xelatex
+urlcolor: blue
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+pacman::p_load("knitr","maps","tmap","sp","rgeos","sf","tidyverse","kableExtra")
+```
+# 1. Overview
+
+## 1.1 Introduction
+
+This project focuses on digging into the dataset of Public Assistance Funded Projects Details for hurricane from 2009 to 2018. Our main objective is to produce US county-level maps that shows declared hurricane. For each map, details about public assistence projects such as the number of projects and the amount of federal share obligated are shown. We built a shiny app to show the map.
+
+## 1.2. Dataset: Public Assistance Funded Projects Details
+
+Source: [**Public Assistance Funded Projects Details**](https://www.fema.gov/openfema-data-page/public-assistance-funded-projects-details-v1)
+
+# 2. Data Cleaning
+
+## 2.1 Clean Disaster Declaration Summaries Dataset
+
+The data was downloaded from the FEMA website. There are total 23 variables in this dataset. For our aim of the project, we filtered down to include only the hurricanes and the dates of interest. The new dataset call DisasterSummariesCleaned. The head of five observations and importnat variables are listed below:  
+
+```{r echo=FALSE}
+data1 <- read.csv("DisasterSummariesCleaned.csv", header = TRUE)
+data1 <- data1 %>%
+            select(c(1,2,7,11,19,24))
+kable(head(data1,n=5)) %>%
+kable_styling(font_size=9.5)
+```
+
+
+## 2.2 Clean Public Assistance Funded Projects Details Dataset
+
+The data was downloaded from the FEMA website. There are total 22 variables in this dataset. For our aim of the project, we filtered down to include only the hurricanes and the dates of interest, and we took 11 variables out to make a new dataset call hurricaneClean. The head of five observations and selected variables are listed below:  
+
+```{r echo=FALSE}
+data2 <- read.csv("hurricaneClean.csv", header = TRUE)
+data2 <- data2 %>% 
+          select(c(-1,-4,-5,-7))
+kable(head(data2,n=5)) %>%
+kable_styling(font_size=7.5)
+```
+
+# 3. Mapping
+
+## 3.1 Data Modification
+
+In order to map these hurricanes, dataset had to be merged together with state and county mapping data from the "maps" R package. Below is the result of merged state data with county fips name and their longitude and latitude.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+#Load data
+disaster <- read.csv("DisasterSummariesCleaned.csv",header = TRUE)
+detail <- read.csv("hurricaneClean.csv",header = TRUE)
+
+#data processing
+#Get name by county.fips
+county_fips <- county.fips
+
+#Get state name + county name
+disaster <- disaster %>%
+  mutate(fips = fipsStateCode * 1000 + fipsCountyCode)
+disaster <- left_join(disaster,county_fips, by = "fips")
+disaster <- disaster %>% 
+  select(c(26,24,2,4,5,11)) %>%
+  mutate(ID = polyname) %>%
+  separate(polyname,c("state","county"),sep = ",")
+disaster <- na.omit(disaster)
+
+#select states 
+StatesInt <- state.name
+StatesInt <- str_to_lower(StatesInt,locale = "en")
+
+#Get county map
+county <- st_as_sf(maps::map("county",StatesInt,plot=F,fill=T))
+
+#Get subdata by condition
+disaster_sub <- disaster %>% 
+                  filter(year==2010,
+                        state=="texas",
+                        disasterNumber==1931,
+                        paProgramDeclared==1)
+
+
+    #Get filtered data
+    
+    disaster_sub <- disaster %>% 
+      filter(year==2010,
+             state=="texas",
+             disasterNumber==1931,
+             paProgramDeclared==1)
+    
+    detail_sub <- detail %>%
+      filter(disasterNumber==1931) %>%
+      mutate(ID = str_c(state,county,sep = ","))
+    
+    detail_sub2 <- detail_sub %>%
+      group_by(ID) %>%
+      summarise(total = sum(totalObligated))
+    
+    detail_sub <- left_join(detail_sub,count(detail_sub,ID),by = "ID")
+    detail_sub <- left_join(detail_sub,detail_sub2,by = "ID")
+    
+    detail_sub <- detail_sub %>% 
+      select(c(13,14,15)) %>%
+      rename("Project Number" = "n","Federal Share Obligated" = "total") %>%
+      mutate(ID = str_to_lower(ID,locale="en"))
+    
+    #Choose by condition
+    county_sub <- subset(county,grepl("texas",county$ID))
+    
+    #Combine
+    county_sub <- left_join(county_sub,disaster_sub,by = "ID")
+    
+    county_sub <- left_join(county_sub,detail_sub,by = "ID")
+    
+    #Deal with PA
+    county_sub[is.na(county_sub)] <- 0
+    
+    county_sub$`Designated Counties` <- ifelse(county_sub$paProgramDeclared==1,"Public Assistance","No Designation")
+    
+    #Get x,y coordinates
+    county_sub <- cbind(county_sub, st_coordinates(st_centroid(county_sub)))
+    
+    #Get county name
+    county_sub <- county_sub %>%
+      separate(ID,c("state","county"),sep = ",")
+    
+    #Filter again
+    county_sub <- county_sub %>%
+                    filter(state=="texas")
+    
+a=c("state","county","Project.Number","Federal.Share.Obligated","Designated.Counties","X","Y")
+county_sub1 <- county_sub[a]
+
+kable(head(county_sub1,n=5)) %>%
+kable_styling(font_size=6)
+```
+
+## 3.2 Basic Map
+
+Once the data was cleaned, the next step was to map the data for each hurricane on separate state maps using the ggplot2 R package. An example of state Texas can be previewed below.
+
+```{r echo=FALSE}
+ ggplot() +
+      geom_sf(data = county_sub) +
+      scale_fill_manual(values = col) +
+      ggtitle("Example of State Texas") +
+      theme(axis.title.x = element_blank(),
+            axis.title.y = element_blank(),
+            axis.text.x=element_blank(),
+            axis.text.y=element_blank(),
+            legend.title = element_text(size = 10),
+            legend.text = element_text(size = 10),
+            plot.title = element_text(hjust = 0.5, face = "bold", size = 10))
+```
+
+
+## 3.3 Feature Added
+
+Next step is to add Public Assistance Project, Project Number and Federal Share Obligated feature to our map. Below is an example for state Taxes.
+
+```{r echo=FALSE, fig.width = 20,fig.height = 20,fig.align  = 'center'}
+#Set color depends on result
+    col <- c("white","lightgoldenrod1")
+    
+    #Plot
+    ##Creaet title
+    b <- unique(county_sub$disasterNumber)
+    b <- b[str_length(b)>2]
+    c <- unique(county_sub$declarationType)
+    c <- c[str_length(c)>1]
+    d <- str_sub(unique(county_sub$declarationDate),1,10)
+    d <- d[str_length(d)>2]
+    e <- unique(county_sub$state)
+    e <- e[str_length(e)>2]
+    title <- str_c("FEMA-",b,"-",c,", ",str_to_title(e)," Disaster Declaration as of ",d,sep = "")
+    
+#Public Assistance Project
+    ggplot() +
+      geom_sf(data = county_sub,aes(fill = Designated.Counties)) +
+      scale_fill_manual(values = col) +
+      ggtitle(title) +
+      geom_text(data = county_sub, aes(X, Y, label = county), size = 3.5, fontface = "bold") +
+      theme(axis.title.x = element_blank(),
+            axis.title.y = element_blank(),
+            axis.text.x=element_blank(),
+            axis.text.y=element_blank(),
+            legend.title = element_text(size = 20),
+            legend.text = element_text(size = 20),
+            plot.title = element_text(hjust = 0.5, face = "bold", size = 40)
+      )
+
+#Project Number
+    ggplot() +
+        geom_sf(data = county_sub,aes(fill = Project.Number)) +
+        scale_fill_gradient(low="white", high="red") +
+        ggtitle(title) +
+        geom_text(data = county_sub, aes(X, Y, label = county), size = 3.5, fontface = "bold") +
+        theme(axis.title.x = element_blank(),
+              axis.title.y = element_blank(),
+              axis.text.x=element_blank(),
+              axis.text.y=element_blank(),
+              legend.title = element_text(size = 20),
+              legend.text = element_text(size = 20),
+              plot.title = element_text(hjust = 0.5, face = "bold", size = 40)
+        )
+      
+#Federal Share Obligated     
+    ggplot() +
+        geom_sf(data = county_sub,aes(fill = Federal.Share.Obligated)) +
+        scale_fill_gradient(low="white", high="red") +
+        ggtitle(title) +
+        geom_text(data = county_sub, aes(X, Y, label = county), size = 3.5, fontface = "bold") +
+        theme(axis.title.x = element_blank(),
+              axis.title.y = element_blank(),
+              axis.text.x=element_blank(),
+              axis.text.y=element_blank(),
+              legend.title = element_text(size = 20),
+              legend.text = element_text(size = 20),
+              plot.title = element_text(hjust = 0.5, face = "bold", size = 40)
+        )
+   
+```
+
+# 4. Shiny App
+
+Finally, a shiny application was created in order to further explore the maps. The shiny app can be viewed [**here**](https://zhuangbc.shinyapps.io/FEMA_Project/)
+ 
