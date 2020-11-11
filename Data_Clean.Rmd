@@ -1,0 +1,39 @@
+---
+title: "FEMA_Data_Cleaning"
+author: "Zijie Huang"
+date: "2020/11/8"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+pacman::p_load("tidyverse","knitr")
+```
+
+```{r}
+#Load data
+#The local file is too big. Which can't be uploaded to github.
+#This is the link to google drive: https://drive.google.com/file/d/1U_Jq_nOSCUKbDVE6zwlpGt1RE8AiVVXn/view?usp=sharing
+disaster <- read.csv("DisasterDeclarationsSummaries.csv",header = TRUE)
+
+#View data
+head(disaster)
+
+#Check Number
+#dim(disaster)
+#60420    23
+
+#Check type
+#disaster$incidentType %>% unique()
+```
+
+```{r}
+#Filter data
+##Only hurriance and Year 2009 - 2018
+disaster <- disaster %>% 
+              filter(incidentType == "Hurricane",
+                     str_sub(declarationDate,1,4) %in% seq(2009,2018,1)) %>%
+              mutate(year = str_sub(declarationDate,1,4))
+#Export data
+write_csv(disaster,"DisasterSummariesCleaned.csv")
+```
