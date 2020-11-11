@@ -1,0 +1,12 @@
+name: FEMA_Project
+title: FEMA_Project
+username:
+account: zhuangbc
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 3204037
+bundleId: 3843948
+url: https://zhuangbc.shinyapps.io/FEMA_Project/
+when: 1605031659.22678
+asMultiple: FALSE
+asStatic: FALSE
