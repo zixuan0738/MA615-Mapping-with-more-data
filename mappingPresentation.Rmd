@@ -1,0 +1,106 @@
+---
+title: "Mapping With more Data Presentation"
+author: "Zixuan Liu, Zijie Huang"
+date: "11/11/2020"
+output:
+  revealjs::revealjs_presentation:
+    theme: solarized
+    transition: default
+    center: false
+    reveal_options:
+      slideNumber: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+pacman::p_load("knitr","maps","tmap","sp","rgeos","sf","tidyverse","kableExtra")
+#install.packages("revealjs", type = "source")
+library(revealjs)
+```
+
+# Introduction
+
+- Objective: produce US county-level maps that shows declared hurricane.
+- Source: <https://www.fema.gov/openfema-data-page/public-assistance-funded-projects-details-v1>. 
+
+
+## Clean Disaster Declaration Summaries Dataset
+
+
+There are total 23 variables in FEMA dataset. For our aim
+of the project, we filtered down to include only the hurricanes and the dates of interest. The new dataset
+call DisasterSummariesCleaned. The head of five observations and importnat variables are listed below:
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+#install.packages("googlesheets4")
+library(googlesheets4)
+disaster = read_sheet("https://docs.google.com/spreadsheets/d/1Mj6pY2S5wIL5wCRV6ekZm4SZ18EayaIPBcGFhhKHbIs/edit#gid=420164385")
+disaster <- disaster %>% select(c(1,2,7,11,19,24))
+kable(head(disaster,n=5)) %>%
+kable_styling(font_size=9.5)
+```
+
+## Clean Public Assistance Funded Projects Details Dataset
+
+There are total 22 variables in FEMA dataset, we only interested in 11 of them. We made a new dataset call hurricaneClean. The head of five observations and selected variables are listed below:
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+library(googlesheets4)
+detail = read_sheet("https://docs.google.com/spreadsheets/d/19QQ8yA2YuPUj3LgINXUkHTCoypzCcEjzTM8YiQ9ru84/edit#gid=759918752")
+detail <- detail %>% 
+          select(c(-1,-4,-5,-7))
+kable(head(detail,n=5)) %>%
+kable_styling(font_size=7.5)
+```
+
+
+
+# Data Modification
+
+- merged together with state and county mapping data from the "maps" R package
+- The head of five observations and selected variables are listed below:
+
+ 
+![image1](https://raw.githubusercontent.com/zixuan0738/MA615---Mapping-Assignment/main/mapping.png)
+
+# Basic Mapping
+- Map the data for each hurricane on separate state maps
+- An example of state Texas can be previewed below.
+
+
+```{r, echo=FALSE}
+knitr::include_graphics("https://github.com/zixuan0738/MA615---Mapping-Assignment/blob/main/sample.png?raw=true",  dpi = NULL)
+```
+
+## Public Assistance Project Feature
+
+An example of state Texas can be previewed below with Public Assistance Project Feature.
+
+
+```{r, echo=FALSE}
+knitr::include_graphics("https://github.com/zixuan0738/MA615---Mapping-Assignment/blob/main/pa1.png?raw=true",  dpi = NULL)
+```
+
+## Project Number Feature
+
+An example of state Texas can be previewed below with Project Number Feature.
+
+```{r, echo=FALSE}
+knitr::include_graphics("https://github.com/zixuan0738/MA615---Mapping-Assignment/blob/main/projectNumber.png?raw=true",  dpi = NULL)
+```
+
+
+## Federal Share Obligated Feature
+
+An example of state Texas can be previewed below with Federal Share Obligated Feature.
+
+```{r, echo=FALSE}
+knitr::include_graphics("https://github.com/zixuan0738/MA615---Mapping-Assignment/blob/main/federalShare.png?raw=true",  dpi = NULL)
+```
+
+# Shiny App
+
+A shiny application was created in order to further explore the maps.
+
+[Click here to see the application](https://zhuangbc.shinyapps.io/FEMA_Project/)
+
