@@ -94,7 +94,25 @@ ui <- fluidPage(
                                 
                                      )
                                   ),
-                                    withSpinner(plotOutput(outputId = "apMap"))
+                                    withSpinner(plotOutput(outputId = "apMap")),
+                          br(),
+                          br(),
+                          br(),
+                          br(),
+                         br(),
+                         br(),
+                         br(),
+                         br(),
+                         br(),
+                         br(),
+                         br(),
+                         br(),
+                                    
+                          hr(),
+                          
+                          fluidRow(
+                            withSpinner(DT::dataTableOutput(outputId = "Table"))
+                                  )
                          
                                 )
                        
@@ -195,19 +213,19 @@ server <- function(input, output) {
     
     #Set color depends on result
     ##PA
-    col <- c("white","lightgoldenrod1")
+    col <- c("grey95","lightgoldenrod1")
     list <- unique(county_sub$paProgramDeclared)
-    if(length(list)==1 & list[1]==1){col <- c("lightgoldenrod1","white")}
+    if(length(list)==1 & list[1]==1){col <- c("lightgoldenrod1","grey95")}
     
     ##Number
     col2 <- "red"
     list2 <- unique(county_sub$Project.Number)
-    if(length(list2)==1 & list2[1]==0){col2 <- "grey90"}
+    if(length(list2)==1 & list2[1]==0){col2 <- "grey95"}
     
     ##Fund
     col3 <- "red"
     list3 <- unique(county_sub$Federal.Share.Obligated)
-    if(length(list3)==1 & list3[1]==0){col3 <- "grey90"}
+    if(length(list3)==1 & list3[1]==0){col3 <- "grey95"}
     
     #Plot
     ##Creaet title
@@ -235,13 +253,14 @@ server <- function(input, output) {
             legend.title = element_text(size = 10),
             legend.text = element_text(size = 10),
             plot.title = element_text(hjust = 0.5, face = "bold", size = 10),
-            text = element_text(family="Times New Roman")
-      )
+            text = element_text(family="Times New Roman") 
+      )+
+        theme_void()
     }
     else if(input$VariableSelect == "Project Number"){
       ggplot() +
         geom_sf(data = county_sub,aes(fill = Project.Number)) +
-        scale_fill_gradient(low="white", high=col2) +
+        scale_fill_gradient(low="grey95", high=col2) +
         ggtitle(title) +
         geom_text(data = county_sub, aes(X, Y, label = county),family="Times New Roman", size = 2, fontface = "bold") +
         theme(axis.title.x = element_blank(),
@@ -252,12 +271,13 @@ server <- function(input, output) {
               legend.text = element_text(size = 10),
               plot.title = element_text(hjust = 0.5, face = "bold", size = 10),
               text = element_text(family="Times New Roman")
-        )
+        ) +
+        theme_void()
     }
     else if(input$VariableSelect == "Federal Share Obligated"){
       ggplot() +
         geom_sf(data = county_sub,aes(fill = Federal.Share.Obligated)) +
-        scale_fill_gradient(low="white", high=col3) +
+        scale_fill_gradient(low="grey95", high=col3) +
         ggtitle(title) +
         geom_text(data = county_sub, aes(X, Y, label = county),family="Times New Roman", size = 2, fontface = "bold") +
         theme(axis.title.x = element_blank(),
@@ -268,7 +288,8 @@ server <- function(input, output) {
               legend.text = element_text(size = 10),
               plot.title = element_text(hjust = 0.5, face = "bold", size = 10),
               text = element_text(family="Times New Roman")
-        )
+        )+
+        theme_void()
       
     }
     
@@ -276,6 +297,50 @@ server <- function(input, output) {
   #Set Size
   height = 550,
   width = 700
+  #550 700
+  )
+  
+  
+  #Create Table
+  output$Table <- DT::renderDataTable(
+    
+    DT::datatable({
+      
+      #Get sub disaster
+      disaster_sub <- disaster %>% 
+        filter(year==as.integer(input$YearSelect),
+               state==input$StateSelect,
+               disasterNumber==as.integer(input$DisasterNumberSelect),
+               paProgramDeclared==1)
+      
+      #Get sub detail
+      detail_sub <- detail %>%
+        filter(disasterNumber==as.integer(input$DisasterNumberSelect),
+               state==str_to_title(input$StateSelect, locale = "en"),
+               county %in% str_to_title(unique(disaster_sub$county), locale = "en")) %>%
+                mutate(ID = str_c(state,county,sep = ","))
+      
+      detail_sub2 <- detail_sub %>%
+        group_by(ID) %>%
+        summarise(total = sum(totalObligated))
+      
+      detail_sub <- left_join(detail_sub,count(detail_sub,ID),by = "ID")
+      detail_sub <- left_join(detail_sub,detail_sub2,by = "ID")
+      
+      detail_sub <- detail_sub %>% 
+        select(c(13,14,15)) %>%
+        rename("Project Number" = "n","Federal Share Obligated" = "total") %>%
+        mutate(ID = str_to_lower(ID,locale="en"))
+      
+      #Combine
+      data <- left_join(disaster_sub,unique(detail_sub),by = "ID")
+      
+      data <- data %>%
+              select(c(8,3,4,9,10))
+      data
+      
+    })
+    
   )
 }
 
