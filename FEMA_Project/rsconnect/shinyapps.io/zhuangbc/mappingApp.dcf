@@ -1,12 +1,12 @@
-name: FEMA_Project
-title: FEMA_Project
+name: mappingApp
+title: mappingApp
 username:
-account: zhuangbc
+account: zixuan0738
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 3204037
 bundleId: 3843948
-url: https://zhuangbc.shinyapps.io/FEMA_Project/
+url: https://zixuan0738.shinyapps.io/mappingApp/
 when: 1605031659.22678
 asMultiple: FALSE
 asStatic: FALSE
